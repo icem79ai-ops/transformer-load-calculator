@@ -1,18 +1,25 @@
+/* =====================================================================
+   style.css — Transformer & LV Feeder Load Calculator
+   © 2026 icem79ai-ops — All Rights Reserved
+   ธีมเน้นความคมชัดสำหรับพิมพ์ขาวดำ: ใช้สีแดง/เขียวเป็นพื้นหลัง
+   และเน้นตัวหนังสือด้วยความหนา/สีสว่างบนพื้นมืด (และรองรับ @media print)
+   ===================================================================== */
+
 :root {
-  --bg: #0f172a;
-  --bg-soft: #1e293b;
-  --panel: #1e293b;
-  --panel-hover: #273449;
-  --border: #334155;
-  --text: #e2e8f0;
-  --text-muted: #94a3b8;
-  --primary: #38bdf8;
+  --bg: #0b1220;            /* พื้นหลังหน้า — เข้มขึ้นเพื่อ contrast */
+  --bg-soft: #17202f;
+  --panel: #131c2b;
+  --panel-hover: #1e2b40;
+  --border: #3a4a63;
+  --text: #f2f6fb;
+  --text-muted: #9fb0c4;
+  --primary: #4cc2ff;
   --primary-dark: #0284c7;
   --accent: #34d399;
   --danger: #f87171;
   --warning: #fbbf24;
   --radius: 12px;
-  --shadow: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,16 +29,18 @@ html, body { height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Tahoma", "Leelawadee UI", "Noto Sans Thai", Helvetica, Arial, sans-serif;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(56,189,248,0.12), transparent 60%),
-    radial-gradient(900px 500px at 10% 110%, rgba(52,211,153,0.10), transparent 60%),
+    radial-gradient(1200px 600px at 80% -10%, rgba(76,194,255,0.10), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(52,211,153,0.08), transparent 60%),
     var(--bg);
   color: var(--text);
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
+  -webkit-print-color-adjust: exact;   /* ให้ bg ติดไปกับ printer */
+  print-color-adjust: exact;
 }
 
 #app {
-  max-width: 900px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 0 14px 60px;
 }
@@ -47,7 +56,7 @@ body {
   background-clip: text;
   color: transparent;
 }
-.brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
 .brand-sub { font-size: 12px; color: var(--text-muted); }
 
 .hidden { display: none !important; }
@@ -69,13 +78,23 @@ body {
   gap: 10px;
   margin-bottom: 14px;
 }
-.panel-head h2 { font-size: 16px; font-weight: 650; color: var(--text); }
+.panel-head h2 { font-size: 16px; font-weight: 800; color: var(--text); }
+.panel-head h2 .step-no {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #04121f;
+  font-size: 12px;
+  border-radius: 6px;
+  padding: 1px 8px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
 
 .count-badge {
   background: var(--primary-dark);
   color: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   padding: 2px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -87,7 +106,7 @@ body {
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 0.06s ease, background 0.15s ease, opacity 0.15s ease;
   font-family: inherit;
@@ -97,9 +116,9 @@ body {
 .btn-sm { padding: 6px 10px; font-size: 13px; }
 .btn-primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #06121f;
+  color: #04121f;
 }
-.btn-primary:hover { filter: brightness(1.05); }
+.btn-primary:hover { filter: brightness(1.08); }
 .btn-ghost {
   background: transparent;
   color: var(--primary);
@@ -120,7 +139,7 @@ input, select {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #0f172a;
+  background: #0a1018;
   color: var(--text);
   font-size: 15px;
   font-family: inherit;
@@ -135,6 +154,7 @@ input::placeholder { color: var(--text-muted); }
   font-size: 12px;
   color: var(--text-muted);
   margin: 10px 0 5px;
+  font-weight: 600;
 }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -149,7 +169,7 @@ input::placeholder { color: var(--text-muted); }
   color: var(--text-muted);
   padding: 12px 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   text-align: center;
   transition: all 0.15s ease;
@@ -158,49 +178,73 @@ input::placeholder { color: var(--text-muted); }
 .seg-btn:hover { background: var(--panel-hover); border-color: var(--primary); }
 .seg-btn.active {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #06121f;
+  color: #04121f;
   border-color: transparent;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .help-tip {
   margin: 8px 0 0;
   padding: 8px 10px;
-  background: rgba(56,189,248,0.07);
+  background: rgba(76,194,255,0.07);
   border-left: 3px solid var(--primary-dark);
   border-radius: 6px;
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.6;
 }
+
+/* ===== วงจร : จัดเรียงแบ่งคอลัมน์ ซ้าย / ขวา ===== */
+#circuits-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.side-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.side-col-head {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+}
+.side-col-head .arrow { color: var(--primary); }
 
 /* ===== Circuit cards ===== */
 .circuit-card {
   background: var(--bg-soft);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);   /* ขอบหนา เพิ่ม contrast ตอนพิมพ์ */
   border-radius: 10px;
   padding: 12px;
-  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.circuit-card:last-child { margin-bottom: 0; }
 
 .circuit-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .circuit-title {
-  font-weight: 700;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text);
 }
+
 .circuit-side {
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 600;
   color: var(--text-muted);
   background: var(--panel);
   border: 1px solid var(--border);
@@ -208,24 +252,59 @@ input::placeholder { color: var(--text-muted); }
   border-radius: 999px;
 }
 
+/* กระแส + โหลดสาย (% เทียบพิกัด) */
 .circuit-live {
   font-size: 12px;
   color: var(--text-muted);
   text-align: right;
+  min-width: 160px;
 }
 .circuit-live .cur {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 900;
   color: var(--text);
 }
-.circuit-live .cur.over { color: var(--danger); }
+/* ตัวเลขกระแสเกินพิกัด → เน้นเป็นป้ายพื้นแดง ตัวหนังสือขาวหนา (พิมพ์ B&W = เทาเข้มขึ้นชัด) */
+.circuit-live .cur.over {
+  color: #fff;
+  background: #b91c1c;
+  border-radius: 5px;
+  padding: 0 6px;
+}
+.cable-pct {
+  font-weight: 800;
+  color: var(--text);
+}
+.cable-pct.over { color: var(--danger); }
+
+/* บรรทัดโหลด kVA รายวงจร (เรียลไทม์) */
+.circuit-kva {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.circuit-kva b { color: var(--accent); }
+
+/* แถบ % โหลดสาย */
+.cablebar {
+  height: 7px;
+  background: #0a1018;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 4px 0 2px;
+}
+.cablebar-fill { height: 100%; border-radius: 999px; transition: width 0.2s ease; }
+.bar-ok   { background: var(--accent); }
+.bar-warn { background: var(--warning); }
+.bar-over { background: var(--danger); }
 
 /* ===== Meter rows inside circuit ===== */
-.meter-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.meter-list { display: flex; flex-direction: column; gap: 6px; }
 
 .meter-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
   background: var(--panel);
@@ -235,24 +314,23 @@ input::placeholder { color: var(--text-muted); }
 }
 .meter-row.disabled { opacity: 0.55; }
 
-.meter-name { font-size: 13px; font-weight: 600; }
+.meter-name { font-size: 13px; font-weight: 700; color: var(--text); }
 .meter-spec { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-.meter-qty-input { width: 62px; padding: 6px 8px; text-align: center; }
-
-.meter-subtotal { font-size: 13px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.meter-subtotal { font-size: 13px; font-weight: 800; color: var(--accent); white-space: nowrap; }
 
 .meter-remove {
   background: transparent;
-  border: 1px solid rgba(248,113,113,0.35);
+  border: 1px solid rgba(248,113,113,0.45);
   color: var(--danger);
   border-radius: 8px;
   width: 30px;
   height: 30px;
   font-size: 15px;
   cursor: pointer;
+  font-weight: 700;
 }
-.meter-remove:hover { background: rgba(248,113,113,0.1); }
+.meter-remove:hover { background: rgba(248,113,113,0.12); }
 
 .meter-add-bar {
   display: grid;
@@ -274,11 +352,11 @@ input::placeholder { color: var(--text-muted); }
   padding: 10px;
   text-align: center;
 }
-.sum-label { display: block; font-size: 11px; color: var(--text-muted); }
+.sum-label { display: block; font-size: 11px; color: var(--text-muted); font-weight: 600; }
 .sum-value {
   display: block;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 900;
   margin-top: 3px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
   -webkit-background-clip: text;
@@ -301,34 +379,34 @@ input::placeholder { color: var(--text-muted); }
   padding: 12px;
   text-align: center;
 }
-.metric-value { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.2; }
-.metric-value.ok { color: var(--accent); }
+.metric-value { font-size: 20px; font-weight: 900; color: var(--text); line-height: 1.25; }
+.metric-value.ok   { color: var(--accent); }
 .metric-value.over { color: var(--danger); }
 .metric-value.hint { color: var(--warning); }
-.metric-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.metric-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
 
 /* ===== Conclusion box ===== */
 .conclusion-box {
   border-radius: 10px;
   padding: 14px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.6;
 }
 .conclusion-box.ok {
-  background: rgba(52,211,153,0.10);
-  border: 1px solid rgba(52,211,153,0.35);
-  color: var(--accent);
+  background: rgba(52,211,153,0.12);
+  border: 2px solid rgba(52,211,153,0.55);
+  color: #86efac;
 }
 .conclusion-box.over {
-  background: rgba(248,113,113,0.10);
-  border: 1px solid rgba(248,113,113,0.4);
-  color: var(--danger);
+  background: rgba(248,113,113,0.14);
+  border: 2px solid rgba(248,113,113,0.65);
+  color: #ffb4b4;
 }
 .conclusion-box.warn {
-  background: rgba(251,191,36,0.10);
-  border: 1px solid rgba(251,191,36,0.4);
-  color: var(--warning);
+  background: rgba(251,191,36,0.12);
+  border: 2px solid rgba(251,191,36,0.55);
+  color: #ffd479;
 }
 .conclusion-box .sub { display: block; font-size: 12px; font-weight: 400; margin-top: 6px; color: var(--text-muted); }
 
@@ -344,41 +422,51 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 thead th {
   background: var(--bg-soft);
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   padding: 9px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
 
-tbody td { padding: 9px 12px; border-bottom: 1px solid rgba(51,65,85,0.4); }
+tbody td { padding: 9px 12px; border-bottom: 1px solid rgba(58,74,99,0.5); color: var(--text); }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--panel-hover); }
 
 td.meter-cell { font-size: 12px; line-height: 1.5; }
 
+/* เซลที่กระแสเกินพิกัด: พื้นหลังแดงอ่อน + ตัวหนังสือหนา (ไม่ใช่ตัวหนังสือแดงล้วน) */
 td.over-cell {
-  color: var(--danger) !important;
-  font-weight: 800;
-  background: rgba(248,113,113,0.10);
+  background: rgba(248,113,113,0.18) !important;
+  font-weight: 900;
+  color: #fff;
 }
 td.over-cell .alert-tag {
+  display: inline-block;
   font-size: 11px;
-  font-weight: 700;
-  color: var(--danger);
-  border: 1px solid rgba(248,113,113,0.5);
+  font-weight: 900;
+  color: #fff;
+  background: #b91c1c;
   border-radius: 999px;
   padding: 1px 8px;
   margin-left: 6px;
   white-space: nowrap;
+  vertical-align: 1px;
 }
 
-.status-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.status-chip.ok { background: rgba(52,211,153,0.15); color: var(--accent); }
-.status-chip.over { background: rgba(248,113,113,0.15); color: var(--danger); }
-.status-chip.warn { background: rgba(251,191,36,0.15); color: var(--warning); }
+.status-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+.status-chip.ok   { background: rgba(52,211,153,0.20);  color: #86efac; border-color: rgba(52,211,153,0.5); }
+.status-chip.over { background: #b91c1c;                color: #fff;    border-color: #ef4444; }
+.status-chip.warn { background: rgba(251,191,36,0.18);  color: #ffd479; border-color: rgba(251,191,36,0.55); }
 
 .result-actions { margin-top: 16px; display: flex; justify-content: center; gap: 10px; }
 .result-actions .btn { min-width: 220px; }
@@ -389,7 +477,7 @@ td.over-cell .alert-tag {
   font-size: 11px;
   color: var(--text-muted);
   padding: 14px 0 6px;
-  border-top: 1px solid rgba(51,65,85,0.4);
+  border-top: 1px solid rgba(58,74,99,0.5);
   line-height: 1.6;
 }
 
@@ -411,16 +499,107 @@ td.over-cell .alert-tag {
   z-index: 200;
   max-width: 90%;
   text-align: center;
+  font-weight: 600;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ===== Responsive ===== */
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   #app { padding: 0 10px 50px; }
+  #circuits-container { grid-template-columns: 1fr; }
   .metrics-grid { grid-template-columns: 1fr; }
   .summary-live { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .meter-row { grid-template-columns: 1fr auto auto; }
   .brand h1 { font-size: 17px; }
   .seg-btn { font-size: 13px; padding: 10px 6px; }
+  .meter-row { grid-template-columns: 1fr auto auto; }
+}
+
+/* =====================================================================
+   @media print — รองรับ Ctrl+P ปริ้นขาวดำ
+   - พื้นขาว ขอบดำ ตัวหนังสือดำหนา
+   - สถานะ OK/OVER ยังมีพื้นเทาอ่อน-เข้มต่างกัน (สีแดง/เขียวกลายเป็นเทา)
+   - ซ่อนปุ่ม/ฟอร์มที่กดไม่ได้ตอนพิมพ์
+   ===================================================================== */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  #app { max-width: 100%; padding: 0; }
+
+  .brand-icon { color: #000; background: none; -webkit-background-clip: initial; background-clip: initial; }
+  .brand h1 { color: #000; font-size: 18px; }
+  .brand-sub { color: #333; }
+
+  .panel, .circuit-card, .metric-card, .summary-live .sum-item, .side-col-head {
+    background: #fff !important;
+    border: 1px solid #555 !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    color: #000;
+  }
+
+  h2, .panel-head h2, .circuit-title { color: #000 !important; }
+
+  input, select {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #555 !important;
+    font-weight: 600;
+  }
+  .field-label, .help-tip { color: #000; }
+  .help-tip { background: #f0f0f0; border-left-color: #000; }
+
+  .seg-btn { background: #fff !important; color: #000 !important; border: 1px solid #777 !important; }
+  .seg-btn.active { background: #999 !important; color: #fff !important; }
+
+  /* ซ่อนปุ่มกด ฟอร์มเพิ่มมิเตอร์ และปุ่มย้อนกลับ */
+  .btn, .btn-calc, .meter-remove, .meter-add-bar, .result-actions, .meter-list .meter-remove { display: none !important; }
+
+  thead th { background: #d9d9d9 !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
+  tbody td { color: #000 !important; border-bottom: 1px solid #bbb !important; }
+  tbody tr:hover { background: #fff !important; }
+  td.meter-cell { color: #000 !important; }
+
+  /* สถานะ: แปลงสีเป็นระดับเทา (แดง = เทาเข้ม, เขียว = เทาอ่อน) ตัวหนังสือดำ/ขาวเด่น */
+  .status-chip { border: 1px solid #000 !important; }
+  .status-chip.ok   { background: #d5d5d5 !important; color: #000 !important; }
+  .status-chip.over { background: #555 !important;   color: #fff !important; }
+  .status-chip.warn { background: #b0b0b0 !important;color: #000 !important; }
+
+  td.over-cell { background: #666 !important; color: #fff !important; }
+  td.over-cell .alert-tag { background: #444 !important; color: #fff !important; }
+
+  .conclusion-box { border: 2px solid #000 !important; color: #000 !important; background: #fff !important; }
+  .conclusion-box.ok   { border-color: #777 !important; }
+  .conclusion-box.over { border-color: #000 !important; }
+  .conclusion-box.warn { border-color: #888 !important; }
+  .conclusion-box .sub { color: #333 !important; }
+
+  .metric-value { color: #000 !important; -webkit-background-clip: initial; background-clip: initial; background: none !important; }
+  .sum-value { color: #000 !important; -webkit-background-clip: initial; background-clip: initial; background: none !important; }
+  .sum-value.warn, .metric-value.over { color: #000 !important; font-weight: 900; }
+
+  .circuit-live { color: #000 !important; }
+  .circuit-live .cur { color: #000 !important; }
+  .circuit-live .cur.over { background: #666 !important; color: #fff !important; }
+  .cable-pct { color: #000 !important; }
+  .cable-pct.over { color: #000 !important; }
+  .circuit-kva { color: #333 !important; }
+  .circuit-kva b { color: #000 !important; }
+
+  .cablebar { background: #e0e0e0 !important; border-color: #888 !important; }
+  .bar-ok   { background: #bbb !important; }
+  .bar-warn { background: #888 !important; }
+  .bar-over { background: #444 !important; }
+
+  .meter-row { background: #fff !important; border-color: #888 !important; }
+  .meter-name { color: #000 !important; }
+  .meter-spec { color: #333 !important; }
+  .meter-subtotal { color: #000 !important; }
+  .empty-note { color: #333 !important; }
+  .app-footer { color: #333 !important; border-top-color: #888 !important; }
+  .count-badge { background: #bbb !important; color: #000 !important; }
+  .toast { display: none !important; }
 }

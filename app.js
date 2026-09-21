@@ -64,9 +64,14 @@ const CIRCUIT_SET = {
   pole:     [1, 3],
   platform: [1, 2, 3, 4],
 };
-const CIRCUIT_SIDE = {
-  1: "ซ้าย", 2: "ขวา", 3: "ซ้าย", 4: "ขวา",
-};
+
+/* แสดงฝั่งของวงจร — ขึ้นกับประเภทการติดตั้ง:
+   เสาเดียว ว.1 = ซ้าย / ว.3 = ขวา (2 สายของหม้อแปลง 1 เฟส)
+   นั่งร้าน  ว.1,3 = ซ้าย / ว.2,4 = ขวา (ฝั่งละ 2 วงจร)      */
+function circuitSide(n) {
+  if (state.installType === "pole") return n === 1 ? "ซ้าย" : "ขวา";
+  return (n === 1 || n === 3) ? "ซ้าย" : "ขวา";
+}
 
 /* แรงดันใช้งานฝั่งแรงต่ำ (ใช้แปลง kVA → กระแสสำหรับวงจรเฟสเดียว) */
 const LV_VOLT = 240; // V
@@ -168,6 +173,32 @@ function toast(msg) {
 
 const fmt = (v, d = 1) => (typeof v === "number" ? v.toFixed(d) : v);
 
+/* อัปเดตหัวการ์ดวงจร (เลขกระแส + แถบ + % + โหลด kVA) เมื่อข้อมูลในวงจรเปลี่ยน */
+function refreshCircuitUI(n) {
+  const cur = document.getElementById("cur-" + n);
+  const bar = document.getElementById("bar-" + n);
+  const pctEl = document.getElementById("pct-" + n);
+  const kvaEl = document.getElementById("kva-" + n);
+  if (!cur || !bar || !pctEl) return;
+  const current = circuitCurrent(n);
+  const ampacity = cabById(state.circuits[n].cable).ampacity;
+  const pct = ampacity > 0 ? (current / ampacity) * 100 : 0;
+  cur.textContent = fmt(current, 0);
+  cur.classList.toggle("over", current > ampacity);
+  bar.style.width = Math.min(pct, 100) + "%";
+  bar.className = "cablebar-fill " + (pct > 100 ? "bar-over" : pct >= 80 ? "bar-warn" : "bar-ok");
+  pctEl.textContent = fmt(pct, 0);
+  pctEl.classList.toggle("over", pct > 100);
+  /* บรรทัดโหลด kVA รายวงจร (เรียลไทม์) — Mode B แยก เดิม/เพิ่ม/รวม */
+  if (kvaEl) {
+    if (state.mode === "B") {
+      kvaEl.innerHTML = `โหลดวงจร: เดิม <b>${fmt(circuitExistingKva(n))}</b> + เพิ่ม <b>${fmt(circuitNewKva(n))}</b> = <b>${fmt(circuitKva(n))}</b> kVA`;
+    } else {
+      kvaEl.innerHTML = `โหลดวงจร: <b>${fmt(circuitNewKva(n))}</b> kVA`;
+    }
+  }
+}
+
 /* =====================================================================
    ระบบคำนวณหลัก
    ===================================================================== */
@@ -217,7 +248,7 @@ function runCalculation() {
     if (over) anyOver = true;
     circuitRows.push({
       num: n,
-      side: CIRCUIT_SIDE[n],
+      side: circuitSide(n),
       kva, kvaEx, kvaNew, current,
       meters: meterDetailStr(n),          // เช่น "5(15)A × 2, 15(45)A × 1"
       cable: cable.name, ampacity: cable.ampacity, over,
@@ -393,28 +424,46 @@ function renderInput() {
   sizeSel.value = String(state.existingSize);
   if (!sizeSel.value) sizeSel.value = String(sizes[0]);
 
-  /* --- เรนเดอร์การ์ดวงจรเฉพาะวงจรที่เปิดใช้งาน --- */
+  /* --- เรนเดอร์การ์ดวงจร — จัดแยกเป็นคอลัมน์ "ฝั่งซ้าย" / "ฝั่งขวา" ---
+     เสาเดียว  : วงจร 1 (ซ้าย) | วงจร 3 (ขวา)
+     นั่งร้าน   : วงจร 1,3 (ซ้าย) | วงจร 2,4 (ขวา)                */
   const container = $("#circuits-container");
-  container.innerHTML = "";
+  container.innerHTML = `
+    <div class="side-col" id="col-left">
+      <div class="side-col-head"><span class="arrow">&#8592;</span> ฝั่งซ้าย</div>
+      <div id="col-left-body"></div>
+    </div>
+    <div class="side-col" id="col-right">
+      <div class="side-col-head">ฝั่งขวา <span class="arrow">&#8594;</span></div>
+      <div id="col-right-body"></div>
+    </div>`;
+  const leftBody = $("#col-left-body");
+  const rightBody = $("#col-right-body");
+
   activeCircuits().forEach((n) => {
     const c = state.circuits[n];
     const current = circuitCurrent(n);
     const ampacity = cabById(c.cable).ampacity;
+    const pct = ampacity > 0 ? (current / ampacity) * 100 : 0;     // % โหลดสายวงจรนี้
+    const barCls = pct > 100 ? "bar-over" : pct >= 80 ? "bar-warn" : "bar-ok";
 
     const card = document.createElement("div");
     card.className = "circuit-card";
 
-    /* หัวการ์ด : ชื่อวงจร + กระแสสด */
+    /* หัวการ์ด : ชื่อวงจร + กระแสสด + แถบ % โหลดสายเทียบพิกัด */
     const head = document.createElement("div");
     head.className = "circuit-head";
     head.innerHTML = `
       <div class="circuit-title">
-        <span class="circuit-side">ฝั่ง${CIRCUIT_SIDE[n]}</span>
+        <span class="circuit-side">ฝั่ง${circuitSide(n)}</span>
         วงจรที่ ${n}
       </div>
       <div class="circuit-live">
         กระแสรวม <span class="cur ${current > ampacity ? "over" : ""}" id="cur-${n}">${fmt(current, 0)}</span> A
-        <span style="opacity:.6">/ พิกัดสาย ${ampacity} A</span>
+        <span style="opacity:.7">/ พิกัด ${ampacity} A</span>
+        <div class="cablebar"><div class="cablebar-fill ${barCls}" id="bar-${n}" style="width:${Math.min(pct, 100)}%"></div></div>
+        โหลดสาย <span class="cable-pct ${pct > 100 ? "over" : ""}" id="pct-${n}">${fmt(pct, 0)}</span> %
+        <div class="circuit-kva" id="kva-${n}"></div>
       </div>`;
     card.appendChild(head);
 
@@ -455,11 +504,20 @@ function renderInput() {
       <input type="number" class="new-qty" data-add-qty="${n}" value="1" min="1" max="999">
       <button class="btn btn-primary btn-sm" data-add-btn="${n}">+ เพิ่มมิเตอร์</button>`;
     card.appendChild(addBar);
-    container.appendChild(card);
+    /* ใส่การ์ดลงคอลัมน์ตามฝั่ง: เสาเดียว ว.1=ซ้าย ว.3=ขวา | นั่งร้าน ว.1,3=ซ้าย ว.2,4=ขวา */
+    const target = circuitSide(n) === "ซ้าย" ? leftBody : rightBody;
+    target.appendChild(card);
 
     renderMeterSelectOptions(addBar.querySelector("select"));
     renderMeterList(n);
   });
+
+  /* ถ้าฝั่งใดไม่มีวงจรถูกวางอยู่ ซ่อนคอลัมน์นั้น
+   (คิดจาก "ฝั่งของวงจร" ไม่ใช่เลขวงจร — เสาเดียว ว.3 = ขวา) */
+  const hasLeftSide = activeCircuits().some((n) => circuitSide(n) === "ซ้าย");
+  const hasRightSide = activeCircuits().some((n) => circuitSide(n) === "ขวา");
+  if (!hasLeftSide) $("#col-left").style.display = "none";
+  if (!hasRightSide) $("#col-right").style.display = "none";
 
   $("#active-circuit-badge").textContent = activeCircuits().length + " วงจร";
   updateLiveSummary();
@@ -486,6 +544,7 @@ function renderMeterList(circuitNum) {
         </div>`;
       }).join("");
   updateLiveSummary();
+  refreshCircuitUI(circuitNum);   // อัปเดตกระแส/แถบ/%/kVA ของวงจรแบบเรียลไทม์
 }
 
 /* สรุปโหลดสดด้านล่างหน้าจอกรอกข้อมูล */
@@ -684,8 +743,7 @@ document.addEventListener("input", (e) => {
     const n = parseInt(cableSel.dataset.cable, 10);
     state.circuits[n].cable = cableSel.value;
     updateLiveSummary();
-    const cur = document.getElementById("cur-" + n);
-    if (cur) cur.classList.toggle("over", circuitCurrent(n) > cabById(cableSel.value).ampacity);
+    refreshCircuitUI(n);
     return;
   }
 
@@ -696,8 +754,7 @@ document.addEventListener("input", (e) => {
     const v = parseFloat(exKva.value);
     state.circuits[n].existingKva = (v > 0 && isFinite(v)) ? v : 0;
     updateLiveSummary();
-    const cur = document.getElementById("cur-" + n);
-    if (cur) cur.classList.toggle("over", circuitCurrent(n) > cabById(state.circuits[n].cable).ampacity);
+    refreshCircuitUI(n);
     return;
   }
 });
