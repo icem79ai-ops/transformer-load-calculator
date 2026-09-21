@@ -383,6 +383,16 @@ td.over-cell .alert-tag {
 .result-actions { margin-top: 16px; display: flex; justify-content: center; gap: 10px; }
 .result-actions .btn { min-width: 220px; }
 
+/* ===== Footer ===== */
+.app-footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 14px 0 6px;
+  border-top: 1px solid rgba(51,65,85,0.4);
+  line-height: 1.6;
+}
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;
