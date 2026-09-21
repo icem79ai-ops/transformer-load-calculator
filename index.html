@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>คำนวณโหลดหม้อแปลงและวงจรแรงต่ำ — โครงการที่อยู่อาศัย (ขยายเขตระบบไฟฟ้า)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-icon">&#9889;</span>
+        <div>
+          <h1>คำนวณโหลดหม้อแปลงและวงจรแรงต่ำ</h1>
+          <span class="brand-sub">สำหรับโครงการที่อยู่อาศัย — ขยายเขตระบบไฟฟ้าแรงต่ำ</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ หน้าจอที่ 1 : กรอกข้อมูล ============ -->
+  <section id="view-input">
+
+    <!-- 1. ตั้งค่าพื้นฐาน -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>&#9881; ตั้งค่าพื้นฐาน</h2>
+      </div>
+
+      <!-- โหมดการคำนวณ -->
+      <div class="seg-row">
+        <button class="seg-btn active" data-mode="A" id="mode-a-btn">ติดตั้งหม้อแปลงใหม่</button>
+        <button class="seg-btn" data-mode="B" id="mode-b-btn">เพิ่มโหลดในหม้อแปลงเดิม</button>
+      </div>
+
+      <label class="field-label" for="max-load-pct">เปอร์เซ็นต์โหลดสูงสุดที่ยอมรับได้ของหม้อแปลง (%)</label>
+      <input type="number" id="max-load-pct" min="1" max="100" step="1" value="80">
+      <p class="help-tip">ตามแนวปฏิบัติการออกแบบมาตรฐาน ใช้อัตราโหลดหม้อแปลงไม่เกิน 80% ของพิกัด</p>
+    </section>
+
+    <!-- 2. ข้อมูลหม้อแปลง (ขึ้นกับโหมด) -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>&#9213; ข้อมูลหม้อแปลง</h2>
+      </div>
+
+      <!-- ประเภทการติดตั้ง (ทั้ง 2 โหมด) -->
+      <label class="field-label">ประเภทการติดตั้งหม้อแปลง</label>
+      <div class="seg-row">
+        <button class="seg-btn active" data-install="pole" id="install-pole-btn">แขวนเสาเดียว</button>
+        <button class="seg-btn" data-install="platform" id="install-platform-btn">นั่งร้าน</button>
+      </div>
+      <p class="help-tip" id="install-hint">เสาเดียว: วงจรที่ 1 (ซ้าย) และ 3 (ขวา) &nbsp;|&nbsp; นั่งร้าน: วงจร 1, 3 (ซ้าย) + 2, 4 (ขวา)</p>
+
+      <!-- โหมด A: เลือกขนาดหม้อแปลงใหม่ -->
+      <div id="mode-a-box">
+        <label class="field-label" for="new-tx-size">ขนาดหม้อแปลงใหม่</label>
+        <select id="new-tx-size"></select>
+      </div>
+
+      <!-- โหมด B: ขนาดหม้อแปลงเดิม -->
+      <div id="mode-b-box" class="hidden">
+        <label class="field-label" for="existing-size">ขนาดหม้อแปลงตัวเดิม</label>
+        <select id="existing-size"></select>
+        <p class="help-tip">โหลดเดิมให้กรอกเป็นค่า kVA ในช่อง "โหลดเดิม (kVA)" ของแต่ละวงจร ระบบจะรวมให้อัตโนมัติ</p>
+      </div>
+    </section>
+
+    <!-- 3. วงจรแรงต่ำ -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>&#10141; วงจรแรงต่ำ (Low Voltage Feeders)</h2>
+        <span class="count-badge" id="active-circuit-badge">2 วงจร</span>
+      </div>
+      <div id="circuits-container"></div>
+    </section>
+
+    <!-- 4. สรุป + ปุ่มคำนวณ -->
+    <section class="panel" id="live-summary-panel">
+      <div class="summary-live">
+        <div class="sum-item"><span class="sum-label">โหลดมิเตอร์ใหม่รวม</span><span class="sum-value" id="live-total-kva">0.0 kVA</span></div>
+        <div class="sum-item"><span class="sum-label">จำนวนมิเตอร์</span><span class="sum-value" id="live-meter-count">0 เครื่อง</span></div>
+        <div class="sum-item" id="live-tx-item"><span class="sum-label" id="live-tx-label">โหลดรวม (หลัง + โหลดเดิม)</span><span class="sum-value" id="live-total-load">0.0 kVA</span></div>
+      </div>
+      <button class="btn btn-primary btn-calc" id="btn-calculate">&#10148; คำนวณ</button>
+    </section>
+
+  </section>
+
+  <!-- ============ หน้าจอที่ 2 : ผลลัพธ์ ============ -->
+  <section id="view-result" class="hidden">
+
+    <!-- บทสรุปหม้อแปลง -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>&#9213; บทสรุปหม้อแปลง</h2>
+        <button class="btn btn-ghost btn-sm" id="btn-back">&#8617; ย้อนกลับไปแก้ไขข้อมูล</button>
+      </div>
+      <div class="metrics-grid" id="result-metrics"></div>
+      <div class="conclusion-box" id="result-conclusion"></div>
+    </section>
+
+    <!-- สรุปรายวงจร -->
+    <section class="panel">
+      <div class="panel-head"><h2>&#10141; สรุปกระแสไฟฟ้ารายวงจร</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>วงจร</th>
+              <th>มิเตอร์ในวงจร (ขนาด × จำนวน)</th>
+              <th id="th-kva-ex">โหลดเดิม (kVA)</th>
+              <th id="th-kva-new">โหลดเพิ่ม (kVA)</th>
+              <th>โหลดรวม (kVA)</th>
+              <th>กระแส (A)</th>
+              <th>สายไฟที่เลือก</th>
+              <th>พิกัดสาย (A)</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody id="result-circuit-rows"></tbody>
+        </table>
+      </div>
+      <div class="result-actions">
+        <button class="btn btn-primary" id="btn-back-bottom">&#8617; ย้อนกลับไปแก้ไขข้อมูล</button>
+      </div>
+    </section>
+
+  </section>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
