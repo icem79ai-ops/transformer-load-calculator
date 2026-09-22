@@ -162,6 +162,18 @@ input::placeholder { color: var(--text-muted); }
 
 /* ===== Segment (radio-like toggle) ===== */
 .seg-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; margin-bottom: 4px; }
+.seg-row-sm { gap: 6px; }
+.seg-row-sm .seg-btn { padding: 7px 8px; font-size: 12px; }
+
+.mode-toggle-row {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.kva-direct-input { margin-top: 6px; }
 .seg-btn {
   background: var(--bg-soft);
   border: 1px solid var(--border);
@@ -385,6 +397,30 @@ input::placeholder { color: var(--text-muted); }
 .metric-value.hint { color: var(--warning); }
 .metric-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
 
+/* ===== แถบหม้อแปลงที่ควรใช้ (โหลดเกิน) ===== */
+.recommend-box {
+  background: linear-gradient(135deg, rgba(76,194,255,0.18), rgba(52,211,153,0.14));
+  border: 2px solid var(--primary);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.recommend-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+.recommend-main {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 4px 0;
+}
+.recommend-sub { font-size: 12px; color: var(--text-muted); }
+
 /* ===== Conclusion box ===== */
 .conclusion-box {
   border-radius: 10px;
@@ -576,6 +612,10 @@ td.over-cell .alert-tag {
   .conclusion-box.over { border-color: #000 !important; }
   .conclusion-box.warn { border-color: #888 !important; }
   .conclusion-box .sub { color: #333 !important; }
+
+  .recommend-box { background: #e9e9e9 !important; border: 2px solid #000 !important; }
+  .recommend-title, .recommend-sub { color: #000 !important; }
+  .recommend-main { color: #000 !important; }
 
   .metric-value { color: #000 !important; -webkit-background-clip: initial; background-clip: initial; background: none !important; }
   .sum-value { color: #000 !important; -webkit-background-clip: initial; background-clip: initial; background: none !important; }

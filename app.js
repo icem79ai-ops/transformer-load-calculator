@@ -86,10 +86,14 @@ const state = {
   newTxSize: "auto",         // (โหมด A) "auto" = ระบบแนะนำ | หรือขนาด kVA ที่เลือกเอง
   existingSize: 30,          // (โหมด B) ขนาดหม้อแปลงตัวเดิม (kVA)
   circuits: {                // ข้อมูลวงจรทั้ง 4 (วงจรที่ปิดอยู่จะไม่ถูกนำมาคำนวณ)
-    1: { cable: "50", existingKva: 0, meters: [] },  // meters: [{id, qty}, ...]
-    2: { cable: "50", existingKva: 0, meters: [] },
-    3: { cable: "50", existingKva: 0, meters: [] },
-    4: { cable: "50", existingKva: 0, meters: [] },
+    // existingKva = โหลดเดิมของวงจร (kVA) — เฉพาะโหมด B (โหลดที่หม้อแปลงจ่ายอยู่ก่อนขยายเขต)
+    // addMode     = "meter" | "kva" — วิธีกรอกโหลดที่เพิ่ม:
+    //               "meter" = ใส่จำนวนมิเตอร์ตามขนาด (meters)
+    //               "kva"   = กรอกค่า kVA รวมของโหลดเพิ่มตรงๆ (addKva)
+    1: { cable: "50", existingKva: 0, addMode: "meter", addKva: 0, meters: [] },
+    2: { cable: "50", existingKva: 0, addMode: "meter", addKva: 0, meters: [] },
+    3: { cable: "50", existingKva: 0, addMode: "meter", addKva: 0, meters: [] },
+    4: { cable: "50", existingKva: 0, addMode: "meter", addKva: 0, meters: [] },
   },
 };
 let view = "input";          // สลับหน้าจอ "input" <-> "result"
@@ -102,40 +106,45 @@ const activeCircuits = () => CIRCUIT_SET[state.installType];
 const meterById = (id) => METERS.find((m) => m.id === id);
 const cabById = (id) => CABLES[id];
 
-/* --- โหลดเดิมของวงจร (kVA) — เฉพาะโหมด B --- */
+/* --- โหลดเดิมของวงจร (kVA) — เฉพาะโหมด B (โหลดที่จ่ายอยู่ก่อนขยาย) --- */
 function circuitExistingKva(circuitNum) {
   const c = state.circuits[circuitNum];
   return (state.mode === "B" ? (c.existingKva || 0) : 0);
 }
 
-/* --- โหลดเพิ่มจากมิเตอร์ใหม่ของวงจร (kVA) --- */
+/* --- โหลดเพิ่มของวงจร (kVA) — คำนวณตาม addMode ที่เลือก (เฉพาะโหมด B) --- */
 function circuitNewKva(circuitNum) {
   const c = state.circuits[circuitNum];
+  if (state.mode === "B" && c.addMode === "kva") return (c.addKva || 0);
   return c.meters.reduce((sum, m) => sum + meterById(m.id).kva * m.qty, 0);
 }
 
-/* โหลดรวมของวงจร (kVA) = โหลดเดิม + โหลดมิเตอร์ใหม่ */
+/* โหลดรวมของวงจร (kVA) = โหลดเดิม + โหลดเพิ่ม */
 function circuitKva(circuitNum) {
   return circuitExistingKva(circuitNum) + circuitNewKva(circuitNum);
 }
 
-/* กระแสรวมของวงจร (A) = กระแสจากโหลดเดิม + ผลรวมกระแสของมิเตอร์ใหม่ */
+/* กระแสรวมของวงจร (A) = กระแสจากโหลดเดิม + กระแสจากโหลดเพิ่ม */
 function circuitCurrent(circuitNum) {
   const c = state.circuits[circuitNum];
   let i = 0;
   if (state.mode === "B" && c.existingKva) i += (c.existingKva * 1000) / LV_VOLT;
-  i += c.meters.reduce((sum, m) => sum + meterById(m.id).ampA * m.qty, 0);
+  if (state.mode === "B" && c.addMode === "kva") {
+    if (c.addKva) i += (c.addKva * 1000) / LV_VOLT;   // โหลด kVA ตรง → กระแสที่ 240V
+  } else {
+    i += c.meters.reduce((sum, m) => sum + meterById(m.id).ampA * m.qty, 0);
+  }
   return i;
 }
 
-/* รายละเอียดมิเตอร์ในวงจร: "5(15)A × 2, 15(45)A × 1" */
+/* รายละเอียดโหลดเพิ่มในวงจร (แสดงในตารางผลลัพธ์) */
 function meterDetailStr(circuitNum) {
-  return state.circuits[circuitNum].meters
-    .map((m) => {
-      const meta = meterById(m.id);
-      return meta.short + " × " + m.qty;
-    })
+  const c = state.circuits[circuitNum];
+  if (state.mode === "B" && c.addMode === "kva") return "โหลด kVA ตรง (" + fmt(c.addKva || 0) + " kVA)";
+  const list = c.meters
+    .map((m) => meterById(m.id).short + " × " + m.qty)
     .join(", ");
+  return list || "—";
 }
 
 /* โหลดเดิมรวมทุกวงจร (kVA) — เฉพาะโหมด B */
@@ -144,18 +153,18 @@ function totalExistingKva() {
   return activeCircuits().reduce((s, n) => s + (state.circuits[n].existingKva || 0), 0);
 }
 
-/* โหลดมิเตอร์ใหม่รวมทุกวงจร (kVA) */
+/* โหลดเพิ่มรวมทุกวงจร (kVA) — นับทั้ง addMode มิเตอร์ และ kVA ตรง */
 function totalNewKva() {
-  return activeCircuits().reduce((s, n) => s + circuitKvaRaw(n), 0);
-  function circuitKvaRaw(n) {
-    return state.circuits[n].meters.reduce((sum, m) => sum + meterById(m.id).kva * m.qty, 0);
-  }
+  return activeCircuits().reduce((s, n) => s + circuitNewKva(n), 0);
 }
 
-/* จำนวนมิเตอร์ใหม่ทั้งหมด */
+/* จำนวนมิเตอร์ใหม่ทั้งหมด (เฉพาะวงจรที่ใช้ addMode = meter) */
 function totalNewMeters() {
-  return activeCircuits().reduce((sum, n) =>
-    sum + state.circuits[n].meters.reduce((s, m) => s + m.qty, 0), 0);
+  return activeCircuits().reduce((sum, n) => {
+    const c = state.circuits[n];
+    if (c.addMode === "kva") return sum;                  // วงจรแบบ kVA ตรงไม่มีมิเตอร์
+    return sum + c.meters.reduce((s, m) => s + m.qty, 0);
+  }, 0);
 }
 
 /* โหลดรวมทั้งหมดที่ต้องใช้เทียบกับหม้อแปลง */
@@ -258,6 +267,7 @@ function runCalculation() {
   /* --- บทสรุปหม้อแปลง --- */
   let txSummary;
   let conclusion = { tone: "ok", text: "", sub: "" };
+  let recommendedTx = null;   // ขนาดหม้อแปลงที่ควรใช้ (ใช้ตอนโหลดเกินต้องการอัปเกรด)
 
   if (state.mode === "A") {
     /* โหมด A: ใช้ขนาดที่ผู้ใช้เลือก หรือระบบแนะนำอัตโนมัติ */
@@ -292,28 +302,31 @@ function runCalculation() {
         /* โหลดเกินขนาดที่เลือก/เกณฑ์ของเสาเดียว → แนะนำขนาดใหญ่ขึ้นในรายการ หรือเปลี่ยนเป็นนั่งร้าน */
         const alt = suggestFrom(totalKva, maxPct, sizes);
         if (alt && alt.kva !== (pick.tx ? pick.tx.kva : null)) {
+          recommendedTx = alt;
           conclusion = {
             tone: "over",
             text: "โหลดรวม " + fmt(totalKva) + " kVA (" + fmt(pick.loadPct) + "%) เกินเกณฑ์ " + maxPct + "% ของขนาดที่เลือก",
-            sub: "แนะนำใช้ขนาด " + txLabel(alt) + " — โหลดจะอยู่ที่ " + fmt((totalKva / alt.kva) * 100) + "%",
+            sub: "ขนาดที่เลือกไม่เพียงพอต่อโหลดรวม",
           };
         } else {
           const plat = suggestFrom(totalKva, maxPct, SIZE_BY_INSTALL.platform);
+          if (plat) recommendedTx = plat;
           conclusion = {
             tone: "over",
             text: "โหลดรวม " + fmt(totalKva) + " kVA เกินพิกัดหม้อแปลงแขวนเสาเดียวทุกรุ่น (สูงสุด 250 kVA) ที่โหลด " + maxPct + "%",
             sub: plat
-              ? "ต้องเปลี่ยนเป็นหม้อแปลงนั่งร้าน (3 เฟส 416/240V) ขนาด " + txLabel(plat)
+              ? "ต้องเปลี่ยนเป็นหม้อแปลงนั่งร้าน (3 เฟส 416/240V)"
               : "ต้องตัดแบ่งโหลดหรือแยกสถานีหม้อแปลงหลายชุด",
           };
         }
       } else {
         const alt = suggestFrom(totalKva, maxPct, sizes);
         if (alt && alt.kva !== (pick.tx ? pick.tx.kva : null)) {
+          recommendedTx = alt;
           conclusion = {
             tone: "over",
             text: "โหลดรวม " + fmt(totalKva) + " kVA (" + fmt(pick.loadPct) + "%) เกินเกณฑ์ " + maxPct + "% ของขนาดที่เลือก",
-            sub: "แนะนำใช้ขนาด " + txLabel(alt) + " — โหลดจะอยู่ที่ " + fmt((totalKva / alt.kva) * 100) + "%",
+            sub: "ขนาดที่เลือกไม่เพียงพอต่อโหลดรวม",
           };
         } else {
           conclusion = {
@@ -357,10 +370,11 @@ function runCalculation() {
       const allSizes = [].concat(SIZE_BY_INSTALL.platform, SIZE_BY_INSTALL.pole).filter((v, i, a) => a.indexOf(v) === i).sort((x, y) => x - y);
       const up = suggestFrom(totalKva, maxPct, allSizes);
       if (up) {
+        recommendedTx = up;
         conclusion = {
           tone: "over",
-          text: "โหลดรวม " + fmt(totalKva) + " kVA (" + fmt(loadPct) + "%) เกินเกณฑ์ " + maxPct + "% ของหม้อแปลงเดิม → ต้องอัปเกรดหม้อแปลง",
-          sub: "แนะนำใช้หม้อแปลงขนาด " + txLabel(up) + " — โหลดจะอยู่ที่ " + fmt((totalKva / up.kva) * 100) + "%",
+          text: "โหลดรวม " + fmt(totalKva) + " kVA (" + fmt(loadPct) + "%) เกินเกณฑ์ " + maxPct + "% ของหม้อแปลงเดิม — ต้องอัปเกรดหม้อแปลง",
+          sub: "หม้อแปลงเดิมขนาด " + state.existingSize + " kVA ไม่เพียงพอต่อโหลดรวมหลังขยายเขต",
         };
       } else {
         conclusion = {
@@ -382,7 +396,7 @@ function runCalculation() {
     };
   }
 
-  return { txSummary, circuitRows, conclusion };
+  return { txSummary, circuitRows, conclusion, recommendedTx };
 }
 
 /* =====================================================================
@@ -490,25 +504,50 @@ function renderInput() {
     cableRow.querySelector("select").value = c.cable;
     card.appendChild(cableRow);
 
-    /* รายการมิเตอร์ที่เพิ่มเข้าไปแล้ว */
+    /* โหมด B: Toggle เลือกวิธีกรอกโหลด "เพิ่ม" ของวงจรนี้ (kVA ตรง / จำนวนมิเตอร์) */
+    if (state.mode === "B") {
+      const modeToggle = document.createElement("div");
+      modeToggle.className = "mode-toggle-row";
+      modeToggle.innerHTML = `
+        <label class="field-label" style="margin:0">วิธีกรอกโหลดเพิ่มของวงจร:</label>
+        <div class="seg-row seg-row-sm">
+          <button class="seg-btn ${c.addMode === "meter" ? "active" : ""}" data-addmode="meter" data-n="${n}">นับมิเตอร์</button>
+          <button class="seg-btn ${c.addMode === "kva" ? "active" : ""}" data-addmode="kva" data-n="${n}">ใส่ kVA รวม</button>
+        </div>`;
+      card.appendChild(modeToggle);
+
+      if (c.addMode === "kva") {
+        const kvaInput = document.createElement("div");
+        kvaInput.className = "kva-direct-input";
+        kvaInput.innerHTML = `
+          <label class="field-label">โหลดเพิ่มรวมของวงจร (kVA)</label>
+          <input type="number" min="0" step="0.5" value="${c.addKva || 0}" data-add-kva="${n}">`;
+        card.appendChild(kvaInput);
+      }
+    }
+
+    /* รายการมิเตอร์ที่เพิ่มเข้าไปแล้ว (เฉพาะ addMode = meter) */
     const list = document.createElement("div");
     list.className = "meter-list";
     list.dataset.circuit = n;
     card.appendChild(list);
 
-    /* แถบเพิ่มมิเตอร์ใหม่ */
-    const addBar = document.createElement("div");
-    addBar.className = "meter-add-bar";
-    addBar.innerHTML = `
-      <select class="new-meter" data-add-select="${n}"></select>
-      <input type="number" class="new-qty" data-add-qty="${n}" value="1" min="1" max="999">
-      <button class="btn btn-primary btn-sm" data-add-btn="${n}">+ เพิ่มมิเตอร์</button>`;
-    card.appendChild(addBar);
+    /* แถบเพิ่มมิเตอร์ใหม่ (เฉพาะ addMode = meter และโหมด A เสมอ) */
+    let addBar = null;
+    if (state.mode === "A" || c.addMode === "meter") {
+      addBar = document.createElement("div");
+      addBar.className = "meter-add-bar";
+      addBar.innerHTML = `
+        <select class="new-meter" data-add-select="${n}"></select>
+        <input type="number" class="new-qty" data-add-qty="${n}" value="1" min="1" max="999">
+        <button class="btn btn-primary btn-sm" data-add-btn="${n}">+ เพิ่มมิเตอร์</button>`;
+      card.appendChild(addBar);
+      renderMeterSelectOptions(addBar.querySelector("select"));
+    }
     /* ใส่การ์ดลงคอลัมน์ตามฝั่ง: เสาเดียว ว.1=ซ้าย ว.3=ขวา | นั่งร้าน ว.1,3=ซ้าย ว.2,4=ขวา */
     const target = circuitSide(n) === "ซ้าย" ? leftBody : rightBody;
     target.appendChild(card);
 
-    renderMeterSelectOptions(addBar.querySelector("select"));
     renderMeterList(n);
   });
 
@@ -528,21 +567,25 @@ function renderMeterList(circuitNum) {
   const list = document.querySelector(`.meter-list[data-circuit="${circuitNum}"]`);
   if (!list) return;
   const c = state.circuits[circuitNum];
-  list.innerHTML = c.meters.length === 0
-    ? `<div class="empty-note" style="color:var(--text-muted);font-size:12px;padding:2px 4px">ยังไม่มีมิเตอร์ในวงจรนี้ — เพิ่มจากด้านล่าง</div>`
-    : c.meters.map((m, idx) => {
-        const meta = meterById(m.id);
-        const sub = fmt(meta.kva * m.qty);
-        return `
-        <div class="meter-row">
-          <div>
-            <div class="meter-name">${meta.label}</div>
-            <div class="meter-spec">${fmt(meta.kva)} kVA/เครื่อง × ${m.qty} เครื่อง</div>
-          </div>
-          <div class="meter-subtotal">${sub} kVA</div>
-          <button class="meter-remove" data-remove-circuit="${circuitNum}" data-remove-idx="${idx}" title="ลบ">&#10005;</button>
-        </div>`;
-      }).join("");
+  if (state.mode === "B" && c.addMode === "kva") {
+    list.innerHTML = `<div class="empty-note" style="color:var(--text-muted);font-size:12px;padding:2px 4px">ใช้วิธีกรอกโหลด kVA รวม (ไม่ได้นับมิเตอร์)</div>`;
+  } else {
+    list.innerHTML = c.meters.length === 0
+      ? `<div class="empty-note" style="color:var(--text-muted);font-size:12px;padding:2px 4px">ยังไม่มีมิเตอร์ในวงจรนี้ — เพิ่มจากด้านล่าง</div>`
+      : c.meters.map((m, idx) => {
+          const meta = meterById(m.id);
+          const sub = fmt(meta.kva * m.qty);
+          return `
+          <div class="meter-row">
+            <div>
+              <div class="meter-name">${meta.label}</div>
+              <div class="meter-spec">${fmt(meta.kva)} kVA/เครื่อง × ${m.qty} เครื่อง</div>
+            </div>
+            <div class="meter-subtotal">${sub} kVA</div>
+            <button class="meter-remove" data-remove-circuit="${circuitNum}" data-remove-idx="${idx}" title="ลบ">&#10005;</button>
+          </div>`;
+        }).join("");
+  }
   updateLiveSummary();
   refreshCircuitUI(circuitNum);   // อัปเดตกระแส/แถบ/%/kVA ของวงจรแบบเรียลไทม์
 }
@@ -600,8 +643,20 @@ function renderResult() {
     </div>`;
 
   const concl = $("#result-conclusion");
-  concl.className = "conclusion-box " + r.conclusion.tone;
-  concl.innerHTML = r.conclusion.text + `<span class="sub">${r.conclusion.sub}</span>`;
+
+  /* แถบ "หม้อแปลงที่ควรใช้" — เด่นชัดเมื่อโหลดเกินจนต้องอัปเกรด/เปลี่ยนขนาด */
+  let recommendHtml = "";
+  if (r.recommendedTx) {
+    const recPct = (r.txSummary.loadKva / r.recommendedTx.kva) * 100;
+    recommendHtml = `
+      <div class="recommend-box">
+        <div class="recommend-title">&#9213; หม้อแปลงที่ควรใช้</div>
+        <div class="recommend-main">${txLabel(r.recommendedTx)}</div>
+        <div class="recommend-sub">โหลดรวม ${fmt(r.txSummary.loadKva)} kVA จะอยู่ที่ ${fmt(recPct)}% ของพิกัด (เกณฑ์ ≤ ${state.maxLoadPct}%)</div>
+      </div>`;
+  }
+  concl.innerHTML = recommendHtml +
+    `<div class="conclusion-box ${r.conclusion.tone}">${r.conclusion.text}<span class="sub">${r.conclusion.sub}</span></div>`;
 
   /* --- ตารางสรุปกระแสไฟฟ้ารายวงจร --- */
   /* โหมด A ไม่มีโหลดเดิม → ซ่อนคอลัมน์ "โหลดเดิม" */
@@ -713,13 +768,22 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  /* โหมด B: สลับวิธีกรอกโหลดเพิ่ม (kVA ตรง / นับมิเตอร์) */
+  const addModeBtn = e.target.closest("[data-addmode]");
+  if (addModeBtn) {
+    const n = parseInt(addModeBtn.dataset.n, 10);
+    state.circuits[n].addMode = addModeBtn.dataset.addmode;
+    renderInput();   // เรนเดอร์การ์ดใหม่ให้แสดง/ซ่อนฟิลด์ตามโหมด
+    return;
+  }
+
   /* ปุ่มคำนวณ */
   if (e.target.closest("#btn-calculate")) {
-    if (state.mode === "B" && totalLoadKva() <= 0 && totalNewMeters() <= 0) {
-      toast("กรุณากรอกโหลดเดิม kVA หรือเพิ่มมิเตอร์อย่างน้อย 1 เครื่อง");
+    if (state.mode === "B" && totalLoadKva() <= 0) {
+      toast("กรุณากรอกโหลดเดิม kVA หรือโหลดเพิ่มของแต่ละวงจร");
       return;
     }
-    if (state.mode === "A" && totalNewMeters() === 0) {
+    if (state.mode === "A" && totalNewKva() <= 0) {
       toast("กรุณาเพิ่มมิเตอร์อย่างน้อย 1 เครื่องในวงจร");
       return;
     }
@@ -753,6 +817,17 @@ document.addEventListener("input", (e) => {
     const n = parseInt(exKva.dataset.existingKva, 10);
     const v = parseFloat(exKva.value);
     state.circuits[n].existingKva = (v > 0 && isFinite(v)) ? v : 0;
+    updateLiveSummary();
+    refreshCircuitUI(n);
+    return;
+  }
+
+  /* โหมด B: กรอกโหลดเพิ่มรวม kVA ตรง (วิธี "ใส่ kVA รวม") */
+  const addKva = e.target.closest("[data-add-kva]");
+  if (addKva) {
+    const n = parseInt(addKva.dataset.addKva, 10);
+    const v = parseFloat(addKva.value);
+    state.circuits[n].addKva = (v > 0 && isFinite(v)) ? v : 0;
     updateLiveSummary();
     refreshCircuitUI(n);
     return;
