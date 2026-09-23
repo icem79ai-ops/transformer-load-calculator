@@ -215,6 +215,14 @@ function phaseDetailStr(circuitNum) {
   return "A:" + fmt(p.A) + " B:" + fmt(p.B) + " C:" + fmt(p.C);
 }
 
+/* ป้ายสถานะระบบเฟส — แสดงให้เห็นชัดว่าระบบนี้จัดเฟสหรือไม่ */
+function systemPhaseLabel() {
+  if (isThreePhaseSystem()) {
+    return "ระบบ 3 เฟส 416/240V — จัดเฟส ABCABC อัตโนมัติ";
+  }
+  return "ระบบ 1 เฟส 480/240V (หม้อแปลง 30 kVA) — ไม่มีเฟส A/B/C";
+}
+
 /* รายละเอียดโหลด "เพิ่ม" (มิเตอร์ใหม่) ในวงจร — สำหรับตารางผลลัพธ์ */
 function meterDetailStr(circuitNum) {
   const list = state.circuits[circuitNum].meters
@@ -528,10 +536,13 @@ function renderInput() {
   sizeSel.value = String(state.existingSize);
   if (!sizeSel.value) sizeSel.value = String(sizes[0]);
 
-  /* --- เรนเดอร์การ์ดวงจร — จัดแยกเป็นคอลัมน์ "ฝั่งซ้าย" / "ฝั่งขวา" ---
-     เสาเดียว  : วงจร 1 (ซ้าย) | วงจร 3 (ขวา)
-     นั่งร้าน   : วงจร 1,3 (ซ้าย) | วงจร 2,4 (ขวา)                */
+  /* --- ตัวบ่งชี้ระบบเฟส (เห็นทันทีว่าเป็น 1 เฟส หรือ 3 เฟส 416/240V) --- */
   const container = $("#circuits-container");
+  const sysBanner = document.createElement("div");
+  sysBanner.className = "system-phase-banner";
+  sysBanner.id = "system-phase-banner";
+  sysBanner.textContent = systemPhaseLabel();
+  container.before ? container.before(sysBanner) : container.parentNode.insertBefore(sysBanner, container);
   container.innerHTML = `
     <div class="side-col" id="col-left">
       <div class="side-col-head"><span class="arrow">&#8592;</span> ฝั่งซ้าย</div>
