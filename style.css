@@ -350,6 +350,7 @@ input::placeholder { color: var(--text-muted); }
 .meter-name { font-size: 13px; font-weight: 700; color: var(--text); }
 .meter-spec { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .cell-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.phase-detail { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 400; }
 
 .meter-subtotal { font-size: 13px; font-weight: 800; color: var(--accent); white-space: nowrap; }
 
@@ -661,6 +662,7 @@ td.over-cell .alert-tag {
   .meter-spec { color: #333 !important; }
   .meter-subtotal { color: #000 !important; }
   .empty-note { color: #333 !important; }
+  .phase-detail { color: #333 !important; }
   .existing-load-box { background: #fff !important; border-color: #888 !important; }
   .existing-load-head, .add-load-head, .cell-sub { color: #333 !important; }
   .app-footer { color: #333 !important; border-top-color: #888 !important; }

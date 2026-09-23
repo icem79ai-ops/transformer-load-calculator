@@ -128,11 +128,28 @@ function circuitKva(circuitNum) {
   return circuitExistingKva(circuitNum) + circuitNewKva(circuitNum);
 }
 
-/* กระแสรวมของวงจร (A) = กระแสจากโหลดเดิม + กระแสจากโหลดเพิ่ม */
-function circuitCurrent(circuitNum) {
+/* ===== การจัดเฟสของโหลด (หลักการ balance เฟส) =====
+   ระบบ 3 เฟส 416/240V (หม้อแปลง 50 kVA ขึ้นไป):
+     - มิเตอร์ 1 เฟส  : กระจายเฟส ABCABC ตามลำดับมิเตอร์ในวงจร (ทีละเครื่อง)
+     - มิเตอร์ 3 เฟส  : โหลดครบทั้ง 3 เฟส (ampA × qty ในทุกเฟส)
+     - โหลดเดิม kVA ตรง : กระจายเท่า ๆ กัน 1/3 ต่อเฟส
+   ระบบ 1 เฟส (หม้อแปลง 30 kVA 480/240V):
+     - ไม่มีการแยกเฟส → กระแสรวมทั้งเฟสเดียว
+   % โหลดสายของวงจรใช้เฟสที่มีโหลดสูงสุด (เส้น conductor รับกระแสเฟสของตัวเอง) */
+
+/* ระบบนี้เป็น 3 เฟส หรือไม่? (กำหนดจากขนาดหม้อแปลงที่ใช้จริง/ที่จะใช้) */
+function isThreePhaseSystem() {
+  if (state.mode === "B") return state.existingSize >= 50;          // หม้อแปลงเดิม ≥50kVA
+  if (state.installType === "platform") return true;                 // นั่งร้าน 3P เสมอ
+  if (state.newTxSize !== "auto") return parseInt(state.newTxSize, 10) >= 50;
+  const p = pickFrom(totalLoadKva(), state.maxLoadPct, SIZE_BY_INSTALL.pole);
+  return p.tx ? p.tx.phase === "3P" : true;
+}
+
+/* กระแสรวมวิธีเดิม (ทุกมิเตอร์ + kVA ตรง ลงเฟสเดียว) — ใช้ในระบบ 1 เฟส */
+function circuitCurrentLegacy(circuitNum) {
   const c = state.circuits[circuitNum];
   let i = 0;
-  /* โหลดเดิม */
   if (state.mode === "B") {
     if (c.existingMode === "meter") {
       i += c.existingMeters.reduce((sum, m) => sum + meterById(m.id).ampA * m.qty, 0);
@@ -140,9 +157,62 @@ function circuitCurrent(circuitNum) {
       i += (c.existingKva * 1000) / LV_VOLT;
     }
   }
-  /* โหลดเพิ่ม (มิเตอร์ใหม่) */
   i += c.meters.reduce((sum, m) => sum + meterById(m.id).ampA * m.qty, 0);
   return i;
+}
+
+/* กระแสแยกเฟส A/B/C ของวงจร {A, B, C} — จัดเฟส ABCABC ให้มิเตอร์ 1 เฟส */
+function phaseAmpsOf(circuitNum) {
+  const c = state.circuits[circuitNum];
+  const p = { A: 0, B: 0, C: 0 };
+  if (!isThreePhaseSystem()) {
+    p.A = circuitCurrentLegacy(circuitNum);   // 1 เฟส: รวมทั้งหมด
+    return p;
+  }
+  const seq = ["A", "B", "C"];
+  let idx = 0;
+
+  /* มิเตอร์ 1 เฟส → เรียงเฟส ABCA... ต่อเนื่อง (เดิมก่อน แล้วมิเตอร์ใหม่) */
+  const addSingle = (m) => {
+    const meta = meterById(m.id);
+    if (meta.phase !== "1P") return;
+    for (let k = 0; k < m.qty; k++) {
+      p[seq[idx % 3]] += meta.ampA;           // qty>1 → เฟสละเครื่อง
+      idx++;
+    }
+  };
+  if (state.mode === "B" && c.existingMode === "meter") c.existingMeters.forEach(addSingle);
+  c.meters.forEach(addSingle);
+
+  /* มิเตอร์ 3 เฟส → ลงครบทั้ง 3 เฟส */
+  const addThree = (m) => {
+    const meta = meterById(m.id);
+    if (meta.phase !== "3P") return;
+    const amp = meta.ampA * m.qty;
+    p.A += amp; p.B += amp; p.C += amp;
+  };
+  if (state.mode === "B" && c.existingMode === "meter") c.existingMeters.forEach(addThree);
+  c.meters.forEach(addThree);
+
+  /* โหลดเดิม kVA ตรง → กระจายเท่า ๆ กันทั้ง 3 เฟส */
+  if (state.mode === "B" && c.existingMode === "kva" && c.existingKva) {
+    const per = ((c.existingKva * 1000) / LV_VOLT) / 3;
+    p.A += per; p.B += per; p.C += per;
+  }
+  return p;
+}
+
+/* กระแสพิจารณาของวงจร = เฟสที่รับโหลดสูงสุด (เทียบกับ ampacity สาย) */
+function circuitCurrent(circuitNum) {
+  const p = phaseAmpsOf(circuitNum);
+  return Math.max(p.A, p.B, p.C);
+}
+
+/* ข้อความรายละเอียดเฟส เช่น "A:45 B:15 C:30" (ว่างถ้าระบบ 1 เฟส) */
+function phaseDetailStr(circuitNum) {
+  if (!isThreePhaseSystem()) return "";
+  const p = phaseAmpsOf(circuitNum);
+  return "A:" + fmt(p.A) + " B:" + fmt(p.B) + " C:" + fmt(p.C);
 }
 
 /* รายละเอียดโหลด "เพิ่ม" (มิเตอร์ใหม่) ในวงจร — สำหรับตารางผลลัพธ์ */
@@ -217,9 +287,11 @@ function refreshCircuitUI(n) {
   /* บรรทัดโหลด kVA รายวงจร (เรียลไทม์) — Mode B แยก เดิม/เพิ่ม/รวม */
   if (kvaEl) {
     if (state.mode === "B") {
-      kvaEl.innerHTML = `โหลดวงจร: เดิม <b>${fmt(circuitExistingKva(n))}</b> + เพิ่ม <b>${fmt(circuitNewKva(n))}</b> = <b>${fmt(circuitKva(n))}</b> kVA`;
+      kvaEl.innerHTML = `โหลดวงจร: เดิม <b>${fmt(circuitExistingKva(n))}</b> + เพิ่ม <b>${fmt(circuitNewKva(n))}</b> = <b>${fmt(circuitKva(n))}</b> kVA
+        <span class="phase-detail" id="ph-${n}">${phaseDetailStr(n)}</span>`;
     } else {
-      kvaEl.innerHTML = `โหลดวงจร: <b>${fmt(circuitNewKva(n))}</b> kVA`;
+      kvaEl.innerHTML = `โหลดวงจร: <b>${fmt(circuitNewKva(n))}</b> kVA
+        <span class="phase-detail" id="ph-${n}">${phaseDetailStr(n)}</span>`;
     }
   }
 }
@@ -277,6 +349,7 @@ function runCalculation() {
       kva, kvaEx, kvaNew, current,
       meters: meterDetailStr(n),          // รายละเอียดมิเตอร์ใหม่ (ขยายเขต)
       existing: existingDetailStr(n),     // รายละเอียดโหลดเดิม (kVA ตรง หรือ นับมิเตอร์เดิม)
+      phase: phaseDetailStr(n),           // กระแสแยกรายเฟส "A:.. B:.. C:.." (ว่างถ้า 1P)
       cable: cable.name, ampacity: cable.ampacity, over,
     });
   });
@@ -730,7 +803,7 @@ function renderResult() {
       <td class="meter-cell">${meterCell}</td>
       ${kvaExCell}
       <td>${fmt(row.kva)}</td>
-      <td class="${overCls}">${fmt(row.current)}${row.over ? '<span class="alert-tag">เกินพิกัด!</span>' : ""}</td>
+      <td class="${overCls}">${fmt(row.current)}${row.phase ? `<div class="cell-sub">${row.phase}</div>` : ""}${row.over ? '<span class="alert-tag">เกินพิกัด!</span>' : ""}</td>
       <td class="${overCls}">${row.cable}</td>
       <td>${row.ampacity} A</td>
       <td>${row.over
